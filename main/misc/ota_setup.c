@@ -1,3 +1,6 @@
+#include "global_data.h"
+
+#ifdef OTA_SET
 #include "ota_setup.h"
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
@@ -31,14 +34,14 @@ esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client)
     return err;
 }
 
-void ota_task(void *pvParameters)
+void ota_task(void *pvParameter)
 {
 ota_begin:
-    ESP_LOGI(__func__, "Starting OTA upgrade...");
+    ESP_LOGI(__func__, "Starting Advanced OTA example");
 
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
-        .url = OTA_FIRM_URL,
+        .url = OTA_URL,
         .cert_pem = (char *)server_cert_pem_start,
         .timeout_ms = 10000,
         .keep_alive_enable = true,
@@ -53,7 +56,7 @@ ota_begin:
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
         ESP_LOGE(__func__, "ESP HTTPS OTA Begin failed");
-        vTaskDelay(TEMPO_OTA_CHECK*1000/portTICK_PERIOD_MS);
+        vTaskDelay((OTA_CHECK * 1000)/portTICK_PERIOD_MS);
         goto ota_begin;
     }
 
@@ -86,6 +89,7 @@ ota_begin:
     } else {
         ota_finish_err = esp_https_ota_finish(https_ota_handle);
         if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
+            esp_mqtt_client_publish(client, OTA_TRIG_TOPIC, "OTA Firmware Update Trigged!", 0, 0, 0);
             ESP_LOGI(__func__, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             esp_restart();
@@ -94,7 +98,7 @@ ota_begin:
                 ESP_LOGE(__func__, "Image validation failed, image is corrupted");
             }
             ESP_LOGE(__func__, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
-            vTaskDelay(TEMPO_OTA_CHECK*1000/portTICK_PERIOD_MS);
+            vTaskDelay((OTA_CHECK * 1000)/portTICK_PERIOD_MS);
             goto ota_begin;
         }
     }
@@ -102,6 +106,8 @@ ota_begin:
 ota_end:
     esp_https_ota_abort(https_ota_handle);
     ESP_LOGE(__func__, "ESP_HTTPS_OTA upgrade failed");
-    vTaskDelay(TEMPO_OTA_CHECK*1000/portTICK_PERIOD_MS);
+    vTaskDelay((OTA_CHECK * 1000)/portTICK_PERIOD_MS);
     goto ota_begin;
 }
+
+#endif

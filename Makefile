@@ -3,6 +3,6 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := school_monitor
+PROJECT_NAME := tuto_monitor
 
 include $(IDF_PATH)/make/project.mk

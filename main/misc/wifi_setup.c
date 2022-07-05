@@ -1,24 +1,25 @@
 #include "wifi_setup.h"
 
-
 /* FreeRTOS event group to signal when we are connected*/
 EventGroupHandle_t s_wifi_event_group;
 
 int s_retry_num = 0;
 
-void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_retry_num < MAXIMUM_RETRY) {
             ESP_LOGI(__func__, "retry to connect to the AP");
-            if ( esp_wifi_connect() != ESP_OK )
-                vTaskDelay(30000/portTICK_PERIOD_MS);
+            vTaskDelay(5000/portTICK_PERIOD_MS);
+            esp_wifi_connect();
             s_retry_num++;
         } else {
             esp_restart();
         }
+        ESP_LOGI(__func__,"connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(__func__, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
@@ -59,12 +60,7 @@ void wifi_init_sta(void)
             /* Setting a password implies station will connect to all security modes including WEP/WPA.
              * However these modes are deprecated and not advisable to be used. Incase your Access point
              * doesn't support WPA2, these mode can be enabled by commenting below line */
-	        .threshold.authmode = WIFI_AUTH_WPA2_PSK,
-
-            .pmf_cfg = {
-                .capable = true,
-                .required = false
-            },
+	     .threshold.authmode = WIFI_AUTH_WPA2_PSK,
         },
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
@@ -84,11 +80,11 @@ void wifi_init_sta(void)
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(__func__, "connected to ap SSID:%s",
-                 WIFI_SSID);
+        ESP_LOGI(__func__, "connected to ap SSID:%s password:%s",
+                 WIFI_SSID, WIFI_PASS);
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(__func__, "Failed to connect to SSID:%s",
-                 WIFI_SSID);
+        ESP_LOGI(__func__, "Failed to connect to SSID:%s, password:%s",
+                 WIFI_SSID, WIFI_PASS);
     } else {
         ESP_LOGE(__func__, "UNEXPECTED EVENT");
     }
